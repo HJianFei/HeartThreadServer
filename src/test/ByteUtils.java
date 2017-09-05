@@ -3,6 +3,7 @@ package test;
 import java.io.UnsupportedEncodingException;
 import java.math.BigInteger;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 public class ByteUtils {
@@ -81,6 +82,32 @@ public class ByteUtils {
 	}
 
 	/**
+	 * 总包数
+	 * 
+	 * @param data
+	 * @return
+	 */
+	public static byte[] getAllPacketBytes(int data) {
+		byte[] bytes = new byte[2];
+		bytes[0] = (byte) (data & 0xff);
+		bytes[1] = (byte) ((data & 0xff00) >> 8);
+		return bytes;
+	}
+
+	/**
+	 * 当前包
+	 * 
+	 * @param data
+	 * @return
+	 */
+	public static byte[] getCurrPacketBytes(int data) {
+		byte[] bytes = new byte[2];
+		bytes[0] = (byte) (data & 0xff);
+		bytes[1] = (byte) ((data & 0xff00) >> 8);
+		return bytes;
+	}
+
+	/**
 	 * 包内容属性
 	 * 
 	 * @param subpackage
@@ -107,6 +134,7 @@ public class ByteUtils {
 			str = "000000" + binaryLength;
 		}
 		data = BinaryToByteArray(str);
+		
 		return data;
 	}
 
@@ -175,7 +203,6 @@ public class ByteUtils {
 	public static byte[] BinaryToByteArray(String binaryString) {
 
 		binaryString = binaryString.trim();
-
 		if ((binaryString.length() % 8) != 0) {
 			System.out.println("二进制字符串长度不对");
 			return null;
@@ -183,7 +210,7 @@ public class ByteUtils {
 		byte[] buffer = new byte[binaryString.length() / 8];
 		for (int i = 0; i < buffer.length; i++) {
 			String tmp = binaryString.substring(i * 8, (i + 1) * 8).trim();
-			byte bytes = Byte.parseByte(tmp, 2);
+			byte bytes = (byte)Integer.parseInt(tmp, 2);
 			buffer[i] = bytes;
 		}
 		return buffer;
@@ -224,7 +251,7 @@ public class ByteUtils {
 
 		try {
 
-			int len = 12;
+			int len = 10;
 			String pwd = "12345678";
 			byte[] start = new byte[] { 40 };// 开始符
 			byte[] terminalBytes = getTerminalBytes(cmd);// 命令编号
@@ -245,10 +272,22 @@ public class ByteUtils {
 			} else {
 				contentBytes = tmp;// 不需要加密
 			}
-			int packetCount = contentBytes.length / len;// 数据内容分包数
-			int endPacketLength = (contentBytes.length) % len;// 最后一个数据包的长度
+			System.out.println("全部内容：" + Arrays.toString(contentBytes));
+			int packetCount = contentBytes.length / (len - 4);// 数据内容分包数，为什么-4，是因为包内容里面包含2个字节的总包数，2个字节的当前包
+			int endPacketLength = (contentBytes.length) % (len - 4);// 最后一个数据包的长度
+
+			byte[] allPacketBytes = null;
+			if (endPacketLength > 0) {
+				allPacketBytes = getAllPacketBytes(packetCount + 1);
+				endPacketLength = endPacketLength + 4;
+				System.out.println("总包数：" + (packetCount + 1));
+			} else {
+				allPacketBytes = getAllPacketBytes(packetCount);
+				System.out.println("总包数：" + packetCount);
+			}
+
 			int i = 0;
-			if (packetCount > 1) {// 需要分包处理
+			if (packetCount > 1 || (packetCount == 1 && endPacketLength > 0)) {// 需要分包处理
 				System.out.println("分包处理");
 				for (i = 0; i < packetCount; i++) {
 					// 临时协议头
@@ -259,8 +298,14 @@ public class ByteUtils {
 					byte[] data = new byte[tmp_head.length + len];
 					// 最后发送的数据包
 					byte[] allData = new byte[tmp_head.length + len + 3];
+					// 当前包
+					byte[] currPacketBytes = getCurrPacketBytes(i + 1);
 					// 包内容
-					System.arraycopy(contentBytes, i * len, retAryBytes, 0, len);
+					System.arraycopy(allPacketBytes, 0, retAryBytes, 0, allPacketBytes.length);
+					System.arraycopy(currPacketBytes, 0, retAryBytes, allPacketBytes.length, currPacketBytes.length);
+					System.arraycopy(contentBytes, i * (len - 4), retAryBytes,
+							allPacketBytes.length + currPacketBytes.length, (len - 4));
+					System.out.println("当前包内容：" + Arrays.toString(retAryBytes));
 					// 包内容属性
 					byte[] packetBytes = getPacketBytes(true, encrypt, len);
 					// 数组合并：开始符
@@ -299,7 +344,7 @@ public class ByteUtils {
 					byteList.add(allData);
 
 				}
-				if (endPacketLength > 0) {// 最后一个数据包
+				if (endPacketLength > 4) {// 最后一个数据包
 					// 临时协议头
 					byte[] tmp_head = new byte[53];
 					// 需要校验的数据内容
@@ -308,8 +353,15 @@ public class ByteUtils {
 					byte[] allData = new byte[tmp_head.length + endPacketLength + 3];
 					// 最后一个数据包的长度
 					byte[] endPacket = new byte[endPacketLength];
+					// 当前包
+					byte[] currPacketBytes = getCurrPacketBytes(i + 1);
+
 					// 包内容
-					System.arraycopy(contentBytes, i * len, endPacket, 0, endPacketLength);
+					System.arraycopy(allPacketBytes, 0, endPacket, 0, allPacketBytes.length);
+					System.arraycopy(currPacketBytes, 0, endPacket, allPacketBytes.length, currPacketBytes.length);
+					System.arraycopy(contentBytes, i * (len - 4), endPacket,
+							allPacketBytes.length + currPacketBytes.length, (endPacketLength - 4));
+					System.out.println("当前包内容：" + Arrays.toString(endPacket));
 					// 包内容属性
 					byte[] packetBytes = getPacketBytes(true, encrypt, endPacketLength);
 					// 数组合并：开始符
@@ -358,6 +410,7 @@ public class ByteUtils {
 				byte[] allData = new byte[tmp_head.length + contentBytes.length + 3];
 				// 包内容属性
 				byte[] packetBytes = getPacketBytes(false, encrypt, contentBytes.length);
+				System.out.println("包内容属性："+Arrays.toString(packetBytes));
 				// 数组合并：开始符
 				System.arraycopy(start, 0, tmp_head, 0, start.length);
 				// 数组合并：开始符+命令编号
@@ -385,6 +438,7 @@ public class ByteUtils {
 				// 数组合并：开始符+命令编号+发送时间+包内容属性+流水号+后台服务器用户标识+用户验证标识+发送用户Id+包内容
 				System.arraycopy(tmp_head, 0, data, 0, tmp_head.length);
 				System.arraycopy(contentBytes, 0, data, tmp_head.length, contentBytes.length);
+				System.out.println("当前包内容：" + Arrays.toString(contentBytes));
 				byte[] crcBytes = getCrc(data);
 				// 数组合并：开始符+命令编号+发送时间+包内容属性+流水号+后台服务器用户标识+用户验证标识+发送用户Id+包内容+校验码
 				System.arraycopy(data, 0, allData, 0, data.length);
@@ -432,7 +486,7 @@ public class ByteUtils {
 		}
 		String hexString = Integer.toHexString(wcrc);
 		if (hexString.length() > 4) {
-			return HexString2Bytes(hexString.substring(5));
+			return HexString2Bytes(hexString.substring(4));
 		} else {
 			return HexString2Bytes(hexString);
 		}
