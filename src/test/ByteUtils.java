@@ -3,7 +3,6 @@ package test;
 import java.io.UnsupportedEncodingException;
 import java.math.BigInteger;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 
 public class ByteUtils {
@@ -242,7 +241,7 @@ public class ByteUtils {
 	 * @param cmd
 	 *            命令编号
 	 * @param encrypt
-	 *            是否需要压缩
+	 *            是否需要加密
 	 * @param content
 	 *            发送内容
 	 * @return
@@ -251,7 +250,7 @@ public class ByteUtils {
 
 		try {
 
-			int len = 10;
+			int len = 12;
 			String pwd = "12345678";
 			byte[] start = new byte[] { 40 };// 开始符
 			byte[] terminalBytes = getTerminalBytes(cmd);// 命令编号
@@ -272,7 +271,6 @@ public class ByteUtils {
 			} else {
 				contentBytes = tmp;// 不需要加密
 			}
-			System.out.println("全部内容：" + Arrays.toString(contentBytes));
 			int packetCount = contentBytes.length / (len - 4);// 数据内容分包数，为什么-4，是因为包内容里面包含2个字节的总包数，2个字节的当前包
 			int endPacketLength = (contentBytes.length) % (len - 4);// 最后一个数据包的长度
 
@@ -280,15 +278,12 @@ public class ByteUtils {
 			if (endPacketLength > 0) {
 				allPacketBytes = getAllPacketBytes(packetCount + 1);
 				endPacketLength = endPacketLength + 4;
-				System.out.println("总包数：" + (packetCount + 1));
 			} else {
 				allPacketBytes = getAllPacketBytes(packetCount);
-				System.out.println("总包数：" + packetCount);
 			}
 
 			int i = 0;
 			if (packetCount > 1 || (packetCount == 1 && endPacketLength > 0)) {// 需要分包处理
-				System.out.println("分包处理");
 				for (i = 0; i < packetCount; i++) {
 					// 临时协议头
 					byte[] tmp_head = new byte[53];
@@ -305,7 +300,6 @@ public class ByteUtils {
 					System.arraycopy(currPacketBytes, 0, retAryBytes, allPacketBytes.length, currPacketBytes.length);
 					System.arraycopy(contentBytes, i * (len - 4), retAryBytes,
 							allPacketBytes.length + currPacketBytes.length, (len - 4));
-					System.out.println("当前包内容：" + Arrays.toString(retAryBytes));
 					// 包内容属性
 					byte[] packetBytes = getPacketBytes(true, encrypt, len);
 					// 数组合并：开始符
@@ -361,7 +355,6 @@ public class ByteUtils {
 					System.arraycopy(currPacketBytes, 0, endPacket, allPacketBytes.length, currPacketBytes.length);
 					System.arraycopy(contentBytes, i * (len - 4), endPacket,
 							allPacketBytes.length + currPacketBytes.length, (endPacketLength - 4));
-					System.out.println("当前包内容：" + Arrays.toString(endPacket));
 					// 包内容属性
 					byte[] packetBytes = getPacketBytes(true, encrypt, endPacketLength);
 					// 数组合并：开始符
@@ -401,7 +394,6 @@ public class ByteUtils {
 				}
 
 			} else {// 不需要分包处理
-				System.out.println("不分包处理");
 				// 临时协议头
 				byte[] tmp_head = new byte[53];
 				// 需要验证的数据内容
@@ -410,7 +402,6 @@ public class ByteUtils {
 				byte[] allData = new byte[tmp_head.length + contentBytes.length + 3];
 				// 包内容属性
 				byte[] packetBytes = getPacketBytes(false, encrypt, contentBytes.length);
-				System.out.println("包内容属性："+Arrays.toString(packetBytes));
 				// 数组合并：开始符
 				System.arraycopy(start, 0, tmp_head, 0, start.length);
 				// 数组合并：开始符+命令编号
@@ -438,7 +429,6 @@ public class ByteUtils {
 				// 数组合并：开始符+命令编号+发送时间+包内容属性+流水号+后台服务器用户标识+用户验证标识+发送用户Id+包内容
 				System.arraycopy(tmp_head, 0, data, 0, tmp_head.length);
 				System.arraycopy(contentBytes, 0, data, tmp_head.length, contentBytes.length);
-				System.out.println("当前包内容：" + Arrays.toString(contentBytes));
 				byte[] crcBytes = getCrc(data);
 				// 数组合并：开始符+命令编号+发送时间+包内容属性+流水号+后台服务器用户标识+用户验证标识+发送用户Id+包内容+校验码
 				System.arraycopy(data, 0, allData, 0, data.length);

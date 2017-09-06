@@ -1,6 +1,7 @@
 package test;
 
 import java.security.SecureRandom;
+import java.util.Arrays;
 
 import javax.crypto.Cipher;
 import javax.crypto.SecretKey;
@@ -56,6 +57,8 @@ public class DESUtils {
      * @throws Exception
      */
     public static byte[] decrypt(byte[] src, String password) throws Exception {
+    	
+    	System.out.println("需要加密的内容："+Arrays.toString(src));
         // DES算法要求有一个可信任的随机数源
         SecureRandom random = new SecureRandom();
         // 创建一个DESKeySpec对象

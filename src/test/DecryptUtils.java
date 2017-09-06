@@ -156,11 +156,18 @@ public class DecryptUtils {
 	 * @param data
 	 * @return
 	 */
-	public static String getContent(byte[] data) {
+	public static String getContent(byte[] data, boolean flag) {
 
 		byte[] decrypt = null;
-		byte[] tmp = new byte[data.length - 56];
-		System.arraycopy(data, 53, tmp, 0, tmp.length);
+		byte[] tmp = null;
+		if (flag) {
+			tmp = new byte[data.length - 60];
+			System.arraycopy(data, 57, tmp, 0, tmp.length);
+		} else {
+			tmp = new byte[data.length - 56];
+			System.arraycopy(data, 53, tmp, 0, tmp.length);
+		}
+
 		if (isEncrypt(data)) {
 			try {
 				decrypt = DESUtils.decrypt(tmp, "12345678");
@@ -173,6 +180,55 @@ public class DecryptUtils {
 		}
 		String hexString = new String(decrypt);
 		return hexString;
+	}
+
+	/**
+	 * 包内容字节
+	 * 
+	 * @param data
+	 *            字节数组
+	 * @param flag
+	 *            是否分包
+	 * @return
+	 */
+	public static byte[] getContentByte(byte[] data, boolean flag) {
+
+		byte[] decrypt = null;
+		byte[] tmp = null;
+		if (flag) {
+			tmp = new byte[data.length - 60];
+			System.arraycopy(data, 57, tmp, 0, tmp.length);
+		} else {
+			tmp = new byte[data.length - 56];
+			System.arraycopy(data, 53, tmp, 0, tmp.length);
+		}
+		return decrypt;
+	}
+
+	/**
+	 * 总包数
+	 * 
+	 * @param data
+	 * @return
+	 */
+	public static int getAllPacket(byte[] data) {
+		byte[] tmp = new byte[2];
+		System.arraycopy(data, 53, tmp, 0, tmp.length);
+		String hexString = bytesToHexString(tmp);
+		return Integer.parseInt(hexString, 16);
+	}
+
+	/**
+	 * 当前包
+	 * 
+	 * @param data
+	 * @return
+	 */
+	public static int getCurPacket(byte[] data) {
+		byte[] tmp = new byte[2];
+		System.arraycopy(data, 55, tmp, 0, tmp.length);
+		String hexString = bytesToHexString(tmp);
+		return Integer.parseInt(hexString, 16);
 	}
 
 	/**
