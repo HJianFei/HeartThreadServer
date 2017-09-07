@@ -45,7 +45,8 @@ public class DecryptUtils {
 		StringBuilder sb = new StringBuilder();
 		for (byte b : tmp) {
 			String tmpStr = Integer.toBinaryString(b);
-			String binary = tmpStr.length() < 8 ? ("00000000" + tmpStr).substring(tmpStr.length()) : tmpStr;
+			String binary = tmpStr.length() < 8 ? ("00000000" + tmpStr).substring(tmpStr.length())
+					: tmpStr.substring(tmpStr.length() - 8);
 			sb.append(binary);
 		}
 		return sb.toString();
@@ -154,46 +155,47 @@ public class DecryptUtils {
 	 * 包内容
 	 * 
 	 * @param data
+	 * @param flag
+	 *            是否分包
 	 * @return
 	 */
 	public static String getContent(byte[] data, boolean flag) {
 
 		byte[] decrypt = null;
 		byte[] tmp = null;
-		if (flag) {
+		if (flag) {// 分包
 			tmp = new byte[data.length - 60];
 			System.arraycopy(data, 57, tmp, 0, tmp.length);
-		} else {
+		} else {// 不分包
 			tmp = new byte[data.length - 56];
 			System.arraycopy(data, 53, tmp, 0, tmp.length);
 		}
 
-		if (isEncrypt(data)) {
+		if (isEncrypt(data)) {// 数据加密
 			try {
 				decrypt = DESUtils.decrypt(tmp, "12345678");
 			} catch (Exception e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
 			}
-		} else {
+		} else {// 数据不加密
 			decrypt = tmp;
 		}
-		String hexString = new String(decrypt);
+		
+		byte[] hexStringToBytes = DecryptUtils.hexStringToBytes(decrypt);
+		String hexString = new String(hexStringToBytes);
 		return hexString;
 	}
 
 	/**
-	 * 包内容字节
+	 * 内容字节数组
 	 * 
 	 * @param data
-	 *            字节数组
 	 * @param flag
-	 *            是否分包
 	 * @return
 	 */
 	public static byte[] getContentByte(byte[] data, boolean flag) {
 
-		byte[] decrypt = null;
 		byte[] tmp = null;
 		if (flag) {
 			tmp = new byte[data.length - 60];
@@ -202,7 +204,8 @@ public class DecryptUtils {
 			tmp = new byte[data.length - 56];
 			System.arraycopy(data, 53, tmp, 0, tmp.length);
 		}
-		return decrypt;
+
+		return tmp;
 	}
 
 	/**
@@ -255,7 +258,7 @@ public class DecryptUtils {
 	 *            要转换的字节数组
 	 * @return 转换后的结果
 	 */
-	private static String bytesToHexString(byte[] bytes) {
+	public static String bytesToHexString(byte[] bytes) {
 		StringBuilder sb = new StringBuilder();
 		for (int i = (bytes.length - 1); i >= 0; i--) {
 			String hex = Integer.toHexString(0xFF & bytes[i]);
@@ -265,6 +268,79 @@ public class DecryptUtils {
 			sb.append(hex);
 		}
 		return sb.toString();
+	}
+
+	/**
+	 * 字节数组转16进制字符串并还原数据转义
+	 * 
+	 * @param src
+	 * @return
+	 */
+	public static String bytes2HexString(byte[] src) {
+		StringBuilder stringBuilder = new StringBuilder("");
+		if (src == null || src.length <= 0) {
+			return null;
+		}
+		for (int i = 0; i < src.length; i++) {
+			int v = src[i] & 0xFF;
+			String hv = Integer.toHexString(v);
+			if (hv.length() < 2) {
+				stringBuilder.append(0);
+			}
+			stringBuilder.append(hv);
+		}
+		String parsingEscape = parsingEscape(stringBuilder.toString());
+		return parsingEscape;
+	}
+
+	/**
+	 * 十六进制字符串转字节数组
+	 * 
+	 * @param hexString
+	 * @return
+	 */
+	public static byte[] hexStringToBytes(byte[] src) {
+
+		String hexString = bytes2HexString(src);
+		if (hexString == null || hexString.equals("")) {
+			return null;
+		}
+		hexString = hexString.toUpperCase();
+		int length = hexString.length() / 2;
+		char[] hexChars = hexString.toCharArray();
+		byte[] d = new byte[length];
+		for (int i = 0; i < length; i++) {
+			int pos = i * 2;
+			d[i] = (byte) (charToByte(hexChars[pos]) << 4 | charToByte(hexChars[pos + 1]));
+		}
+		return d;
+	}
+
+	private static byte charToByte(char c) {
+		return (byte) "0123456789ABCDEF".indexOf(c);
+	}
+
+	/**
+	 * 转义字符转回原来的字符串
+	 * 
+	 * @param str
+	 * @return
+	 */
+	public static String parsingEscape(String str) {
+		str = str.toUpperCase();
+		if (str.contains("3D00")) {
+			str = str.replace("3D00", "3D");
+		}
+		if (str.contains("3D15")) {
+			str = str.replace("3D15", "28");
+		}
+		if (str.contains("3D14")) {
+			str = str.replace("3D14", "29");
+		}
+		if (str.contains("3D12")) {
+			str = str.replace("3D12", "2F");
+		}
+		return str;
 	}
 
 }

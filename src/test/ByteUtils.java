@@ -3,6 +3,7 @@ package test;
 import java.io.UnsupportedEncodingException;
 import java.math.BigInteger;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 public class ByteUtils {
@@ -20,6 +21,7 @@ public class ByteUtils {
 		bytes[2] = (byte) ((data & 0xff0000) >> 16);
 		return bytes;
 	}
+	
 
 	/**
 	 * 发送时间
@@ -133,7 +135,7 @@ public class ByteUtils {
 			str = "000000" + binaryLength;
 		}
 		data = BinaryToByteArray(str);
-		
+
 		return data;
 	}
 
@@ -209,8 +211,7 @@ public class ByteUtils {
 		byte[] buffer = new byte[binaryString.length() / 8];
 		for (int i = 0; i < buffer.length; i++) {
 			String tmp = binaryString.substring(i * 8, (i + 1) * 8).trim();
-			byte bytes = (byte)Integer.parseInt(tmp, 2);
-			buffer[i] = bytes;
+			buffer[i] = (byte) Integer.parseInt(tmp, 2);
 		}
 		return buffer;
 	}
@@ -219,7 +220,7 @@ public class ByteUtils {
 	 * 字节数组转字符串
 	 * 
 	 * @param data
-	 *            两个字节数组
+	 *            字节数组
 	 * @return
 	 */
 	public static String ByteToString(byte[] data) {
@@ -233,6 +234,79 @@ public class ByteUtils {
 			tmpStr = builder.append(tmpStr).toString();
 		}
 		return tmpStr;
+	}
+
+	/**
+	 * 字节数组转16进制字符串
+	 * 
+	 * @param src
+	 * @return
+	 */
+	public static String bytesToHexString(byte[] src) {
+		StringBuilder stringBuilder = new StringBuilder("");
+		if (src == null || src.length <= 0) {
+			return null;
+		}
+		for (int i = 0; i < src.length; i++) {
+			int v = src[i] & 0xFF;
+			String hv = Integer.toHexString(v);
+			if (hv.length() < 2) {
+				stringBuilder.append(0);
+			}
+			stringBuilder.append(hv);
+		}
+		String parsingEscape = parsingEscape(stringBuilder.toString());
+		return parsingEscape;
+	}
+
+	/**
+	 * 十六进制字符串转字节数组
+	 * 
+	 * @param hexString
+	 * @return
+	 */
+	public static byte[] hexStringToBytes(byte[] src) {
+
+		String hexString = bytesToHexString(src);
+		if (hexString == null || hexString.equals("")) {
+			return null;
+		}
+		hexString = hexString.toUpperCase();
+		int length = hexString.length() / 2;
+		char[] hexChars = hexString.toCharArray();
+		byte[] d = new byte[length];
+		for (int i = 0; i < length; i++) {
+			int pos = i * 2;
+			d[i] = (byte) (charToByte(hexChars[pos]) << 4 | charToByte(hexChars[pos + 1]));
+		}
+		return d;
+	}
+
+	private static byte charToByte(char c) {
+		return (byte) "0123456789ABCDEF".indexOf(c);
+	}
+
+	/**
+	 * 字符转义
+	 * 
+	 * @param str
+	 * @return
+	 */
+	public static String parsingEscape(String str) {
+        str = str.toUpperCase();
+        if (str.contains("3D")) {
+            str = str.replace("3D", "3D00");
+        }
+        if (str.contains("28")) {
+            str = str.replace("28", "3D15");
+        }
+        if (str.contains("29")) {
+            str = str.replace("29", "3D14");
+        }
+        if (str.contains("2F")) {
+        	str = str.replace("2F", "3D12");
+        }
+		return str;
 	}
 
 	/**
@@ -250,8 +324,8 @@ public class ByteUtils {
 
 		try {
 
-			int len = 12;
-			String pwd = "12345678";
+			int len = 724;// 包内容长度
+			String pwd = "12345678";// 加密密钥
 			byte[] start = new byte[] { 40 };// 开始符
 			byte[] terminalBytes = getTerminalBytes(cmd);// 命令编号
 			byte[] timeBytes = getTimeBytes(System.currentTimeMillis());// 发送时间
@@ -263,7 +337,10 @@ public class ByteUtils {
 
 			List<byte[]> byteList = new ArrayList<>();
 
-			byte[] tmp = content.getBytes("UTF-8");// 包内容字节数组
+			byte[] hexStringToBytes = content.getBytes("UTF-8");// 包内容字节数组
+			System.out.println(Arrays.toString(hexStringToBytes));
+			byte[] tmp = hexStringToBytes(hexStringToBytes);
+			System.out.println(Arrays.toString(tmp));
 
 			byte[] contentBytes = null;
 			if (encrypt) {
@@ -274,7 +351,7 @@ public class ByteUtils {
 			int packetCount = contentBytes.length / (len - 4);// 数据内容分包数，为什么-4，是因为包内容里面包含2个字节的总包数，2个字节的当前包
 			int endPacketLength = (contentBytes.length) % (len - 4);// 最后一个数据包的长度
 
-			byte[] allPacketBytes = null;
+			byte[] allPacketBytes = null;// 总包数的字节数组
 			if (endPacketLength > 0) {
 				allPacketBytes = getAllPacketBytes(packetCount + 1);
 				endPacketLength = endPacketLength + 4;
@@ -293,7 +370,7 @@ public class ByteUtils {
 					byte[] data = new byte[tmp_head.length + len];
 					// 最后发送的数据包
 					byte[] allData = new byte[tmp_head.length + len + 3];
-					// 当前包
+					// 当前包（从1开始）
 					byte[] currPacketBytes = getCurrPacketBytes(i + 1);
 					// 包内容
 					System.arraycopy(allPacketBytes, 0, retAryBytes, 0, allPacketBytes.length);
@@ -335,6 +412,7 @@ public class ByteUtils {
 					System.arraycopy(crcBytes, 0, allData, data.length, crcBytes.length);
 					// 数组合并：开始符+命令编号+发送时间+包内容属性+流水号+后台服务器用户标识+用户验证标识+发送用户Id+包内容+校验码+结束符
 					System.arraycopy(end, 0, allData, data.length + crcBytes.length, end.length);
+					// 添加到发送数据集合
 					byteList.add(allData);
 
 				}
@@ -349,7 +427,6 @@ public class ByteUtils {
 					byte[] endPacket = new byte[endPacketLength];
 					// 当前包
 					byte[] currPacketBytes = getCurrPacketBytes(i + 1);
-
 					// 包内容
 					System.arraycopy(allPacketBytes, 0, endPacket, 0, allPacketBytes.length);
 					System.arraycopy(currPacketBytes, 0, endPacket, allPacketBytes.length, currPacketBytes.length);
@@ -384,6 +461,7 @@ public class ByteUtils {
 					// 数组合并：开始符+命令编号+发送时间+包内容属性+流水号+后台服务器用户标识+用户验证标识+发送用户Id+包内容
 					System.arraycopy(tmp_head, 0, data, 0, tmp_head.length);
 					System.arraycopy(endPacket, 0, data, tmp_head.length, endPacket.length);
+					// 校验码
 					byte[] crcBytes = getCrc(data);
 					// 数组合并：开始符+命令编号+发送时间+包内容属性+流水号+后台服务器用户标识+用户验证标识+发送用户Id+包内容+校验码
 					System.arraycopy(data, 0, allData, 0, data.length);
@@ -464,7 +542,6 @@ public class ByteUtils {
 			high = wcrc >> 8;
 			// 取被校验串的一个字节与 16 位寄存器的高位字节进行“异或”运算
 			wcrc = high ^ data[i];
-
 			for (int j = 0; j < 8; j++) {
 				flag = wcrc & 0x0001;
 				// 把这个 16 寄存器向右移一位
