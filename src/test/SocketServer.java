@@ -23,6 +23,7 @@ public class SocketServer extends Thread {
 		while (!Thread.interrupted()) {
 			try {
 				accept = serverSocket.accept();
+				System.out.println("连接成功");
 				new HandlerThread(accept).start();
 			} catch (IOException e) {
 

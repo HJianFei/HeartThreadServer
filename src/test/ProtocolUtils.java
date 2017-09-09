@@ -6,7 +6,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-public class ByteUtils {
+public class ProtocolUtils {
 
 	/**
 	 * 命令编号
@@ -21,7 +21,6 @@ public class ByteUtils {
 		bytes[2] = (byte) ((data & 0xff0000) >> 16);
 		return bytes;
 	}
-	
 
 	/**
 	 * 发送时间
@@ -151,7 +150,6 @@ public class ByteUtils {
 		try {
 			data = verity.getBytes("UTF-8");
 		} catch (UnsupportedEncodingException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 			return null;
 		}
@@ -293,19 +291,16 @@ public class ByteUtils {
 	 * @return
 	 */
 	public static String parsingEscape(String str) {
-        str = str.toUpperCase();
-        if (str.contains("3D")) {
-            str = str.replace("3D", "3D00");
-        }
-        if (str.contains("28")) {
-            str = str.replace("28", "3D15");
-        }
-        if (str.contains("29")) {
-            str = str.replace("29", "3D14");
-        }
-        if (str.contains("2F")) {
-        	str = str.replace("2F", "3D12");
-        }
+		str = str.toUpperCase();
+		if (str.contains("3D")) {
+			str = str.replace("3D", "3D00");
+		}
+		if (str.contains("28")) {
+			str = str.replace("28", "3D15");
+		}
+		if (str.contains("29")) {
+			str = str.replace("29", "3D14");
+		}
 		return str;
 	}
 
@@ -338,9 +333,7 @@ public class ByteUtils {
 			List<byte[]> byteList = new ArrayList<>();
 
 			byte[] hexStringToBytes = content.getBytes("UTF-8");// 包内容字节数组
-			System.out.println(Arrays.toString(hexStringToBytes));
 			byte[] tmp = hexStringToBytes(hexStringToBytes);
-			System.out.println(Arrays.toString(tmp));
 
 			byte[] contentBytes = null;
 			if (encrypt) {
@@ -557,7 +550,6 @@ public class ByteUtils {
 		} else {
 			return HexString2Bytes(hexString);
 		}
-
 	}
 
 	// 从十六进制字符串到字节数组转换
@@ -578,5 +570,315 @@ public class ByteUtils {
 		if (c >= 'A')
 			return (c - 'A' + 10) & 0x0f;
 		return (c - '0') & 0x0f;
+	}
+
+	/**
+	 * 解析命令编号
+	 * 
+	 * @param data
+	 * @return
+	 */
+	public static String getTerminal(byte[] data) {
+
+		byte[] tmp = new byte[3];
+		System.arraycopy(data, 1, tmp, 0, tmp.length);
+		String hexString = bytesToHexString(tmp);
+		return hexString;
+	}
+
+	/**
+	 * 解析发送时间
+	 * 
+	 * @param data
+	 * @return
+	 */
+	public static long getTime(byte[] data) {
+
+		byte[] tmp = new byte[8];
+		System.arraycopy(data, 4, tmp, 0, tmp.length);
+		String toHexString = bytesToHexString(tmp);
+		return Long.parseLong(toHexString, 16);
+	}
+
+	/**
+	 * 包内容属性二进制字符串
+	 * 
+	 * @param data
+	 * @return
+	 */
+	public static String getPacket(byte[] data) {
+		byte[] tmp = new byte[2];
+		System.arraycopy(data, 12, tmp, 0, tmp.length);
+		StringBuilder sb = new StringBuilder();
+		for (byte b : tmp) {
+			String tmpStr = Integer.toBinaryString(b);
+			String binary = tmpStr.length() < 8 ? ("00000000" + tmpStr).substring(tmpStr.length())
+					: tmpStr.substring(tmpStr.length() - 8);
+			sb.append(binary);
+		}
+		return sb.toString();
+	}
+
+	/**
+	 * 解析是否分包
+	 * 
+	 * @param data
+	 * @return
+	 */
+	public static boolean isSubpackage(byte[] data) {
+		String packet = getPacket(data);
+		String string = packet.substring(2, 3);
+		if (string.equals("1")) {
+			return true;
+		} else {
+			return false;
+		}
+	}
+
+	/**
+	 * 解析是否加密
+	 * 
+	 * @param data
+	 * @return
+	 */
+	public static boolean isEncrypt(byte[] data) {
+		String packet = getPacket(data);
+		String string = packet.substring(5, 6);
+		if (string.equals("1")) {
+			return true;
+		} else {
+			return false;
+		}
+	}
+
+	/**
+	 * 解析数据内容长度
+	 * 
+	 * @param data
+	 * @return
+	 */
+	public static int contentLength(byte[] data) {
+		String packet = getPacket(data);
+		String substring = packet.substring(6, packet.length());
+		BigInteger src = new BigInteger(substring, 2);// 转换为BigInteger类型
+		return Integer.parseInt(src.toString());
+	}
+
+	/**
+	 * 解析流水号
+	 * 
+	 * @param data
+	 * @return
+	 */
+	public static int getSerial(byte[] data) {
+
+		byte[] tmp = new byte[2];
+		System.arraycopy(data, 14, tmp, 0, tmp.length);
+		String hexString = bytesToHexString(tmp);
+
+		return Integer.parseInt(hexString, 16);
+	}
+
+	/**
+	 * 解析后台用户标识
+	 * 
+	 * @param data
+	 * @return
+	 */
+	public static int getServer(byte[] data) {
+		byte[] tmp = new byte[1];
+		System.arraycopy(data, 16, tmp, 0, tmp.length);
+		String hexString = bytesToHexString(tmp);
+		return Integer.parseInt(hexString, 16);
+	}
+
+	/**
+	 * 解析用户验证标识
+	 * 
+	 * @param data
+	 * @return
+	 */
+	public static String getVerify(byte[] data) {
+		byte[] tmp = new byte[32];
+		System.arraycopy(data, 17, tmp, 0, tmp.length);
+		String hexString = new String(tmp);
+		return hexString.trim();
+	}
+
+	/**
+	 * 解析用户Id
+	 * 
+	 * @param data
+	 * @return
+	 */
+	public static int getUserId(byte[] data) {
+		byte[] tmp = new byte[4];
+		System.arraycopy(data, 49, tmp, 0, tmp.length);
+		String hexString = bytesToHexString(tmp);
+		return Integer.parseInt(hexString, 16);
+	}
+
+	/**
+	 * 解析包内容
+	 * 
+	 * @param data
+	 * @param flag
+	 *            是否分包
+	 * @return
+	 */
+	public static String getContent(byte[] data, boolean flag) {
+
+		byte[] decrypt = null;
+		byte[] tmp = null;
+		if (flag) {// 分包
+			tmp = new byte[data.length - 60];
+			System.arraycopy(data, 57, tmp, 0, tmp.length);
+		} else {// 不分包
+			tmp = new byte[data.length - 56];
+			System.arraycopy(data, 53, tmp, 0, tmp.length);
+		}
+
+		if (isEncrypt(data)) {// 数据加密
+			try {
+				decrypt = DESUtils.decrypt(tmp, "12345678");
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
+		} else {// 数据不加密
+			decrypt = tmp;
+		}
+		byte[] hexStringToBytes = hexString2Bytes(decrypt);
+		String hexString = new String(hexStringToBytes);
+		return hexString;
+	}
+
+	/**
+	 * 解析内容字节数组
+	 * 
+	 * @param data
+	 * @param flag
+	 * @return
+	 */
+	public static byte[] getContentByte(byte[] data, boolean flag) {
+
+		byte[] tmp = null;
+		if (flag) {
+			tmp = new byte[data.length - 60];
+			System.arraycopy(data, 57, tmp, 0, tmp.length);
+		} else {
+			tmp = new byte[data.length - 56];
+			System.arraycopy(data, 53, tmp, 0, tmp.length);
+		}
+
+		return tmp;
+	}
+
+	/**
+	 * 解析总包数
+	 * 
+	 * @param data
+	 * @return
+	 */
+	public static int getAllPacket(byte[] data) {
+		byte[] tmp = new byte[2];
+		System.arraycopy(data, 53, tmp, 0, tmp.length);
+		String hexString = bytesToHexString(tmp);
+		return Integer.parseInt(hexString, 16);
+	}
+
+	/**
+	 * 解析当前包
+	 * 
+	 * @param data
+	 * @return
+	 */
+	public static int getCurPacket(byte[] data) {
+		byte[] tmp = new byte[2];
+		System.arraycopy(data, 55, tmp, 0, tmp.length);
+		String hexString = bytesToHexString(tmp);
+		return Integer.parseInt(hexString, 16);
+	}
+
+	/**
+	 * 验证校验码
+	 * 
+	 * @param data
+	 * @return
+	 */
+	public static boolean checkCrc(byte[] data) {
+
+		byte[] tmp = new byte[2];
+		System.arraycopy(data, data.length - 3, tmp, 0, tmp.length);
+		byte[] crcByte = new byte[data.length - 3];
+		System.arraycopy(data, 0, crcByte, 0, data.length - 3);
+		byte[] crc = ProtocolUtils.getCrc(crcByte);
+		boolean b = Arrays.equals(tmp, crc);
+		return b;
+	}
+
+	/**
+	 * 字节数组转16进制字符串并还原数据转义
+	 * 
+	 * @param src
+	 * @return
+	 */
+	public static String bytes2HexString(byte[] src) {
+		StringBuilder stringBuilder = new StringBuilder("");
+		if (src == null || src.length <= 0) {
+			return null;
+		}
+		for (int i = 0; i < src.length; i++) {
+			int v = src[i] & 0xFF;
+			String hv = Integer.toHexString(v);
+			if (hv.length() < 2) {
+				stringBuilder.append(0);
+			}
+			stringBuilder.append(hv);
+		}
+		String parsingEscape = unEscape(stringBuilder.toString());
+		return parsingEscape;
+	}
+
+	/**
+	 * 
+	 * 
+	 * @param hexString
+	 * @return
+	 */
+	public static byte[] hexString2Bytes(byte[] src) {
+
+		String hexString = bytes2HexString(src);
+		if (hexString == null || hexString.equals("")) {
+			return null;
+		}
+		hexString = hexString.toUpperCase();
+		int length = hexString.length() / 2;
+		char[] hexChars = hexString.toCharArray();
+		byte[] d = new byte[length];
+		for (int i = 0; i < length; i++) {
+			int pos = i * 2;
+			d[i] = (byte) (charToByte(hexChars[pos]) << 4 | charToByte(hexChars[pos + 1]));
+		}
+		return d;
+	}
+
+	/**
+	 * 转义字符转回原来的字符串
+	 * 
+	 * @param str
+	 * @return
+	 */
+	public static String unEscape(String str) {
+		str = str.toUpperCase();
+		if (str.contains("3D00")) {
+			str = str.replace("3D00", "3D");
+		}
+		if (str.contains("3D15")) {
+			str = str.replace("3D15", "28");
+		}
+		if (str.contains("3D14")) {
+			str = str.replace("3D14", "29");
+		}
+		return str;
 	}
 }
