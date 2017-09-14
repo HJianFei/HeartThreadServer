@@ -6,6 +6,12 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
+/**
+ * 通讯协议的工具类
+ * 
+ * @author Administrator
+ *
+ */
 public class ProtocolUtils {
 
 	/**
@@ -318,34 +324,33 @@ public class ProtocolUtils {
 	public static List<byte[]> getSendData(int cmd, boolean encrypt, String content) {
 
 		try {
-
-			int len = 724;// 包内容长度
-			String pwd = "12345678";// 加密密钥
 			byte[] start = new byte[] { 40 };// 开始符
 			byte[] terminalBytes = getTerminalBytes(cmd);// 命令编号
 			byte[] timeBytes = getTimeBytes(System.currentTimeMillis());// 发送时间
-			byte[] serialBytes = getSerialBytes(1);// 流水号
-			byte[] serverBytes = getServerBytes(1);// 后台服务器用户标识
-			byte[] verifyBytes = getVerifyBytes("123456");// 用户验证标识
-			byte[] userIdBytes = getUserIdBytes(123456);// 发送用户Id
+			byte[] serialBytes = getSerialBytes(Constans.SERIAL_NUM);// 流水号
+			byte[] serverBytes = getServerBytes(Constans.SERVER_NUM);// 后台服务器用户标识
+			byte[] verifyBytes = getVerifyBytes(Constans.USER_VERIFY_ID);// 用户验证标识
+			byte[] userIdBytes = getUserIdBytes(Constans.USER_ID);// 发送用户Id
 			byte[] end = new byte[] { 41 };// 结束符
 
 			List<byte[]> byteList = new ArrayList<>();
 
 			byte[] hexStringToBytes = content.getBytes("UTF-8");// 包内容字节数组
+
 			byte[] tmp = hexStringToBytes(hexStringToBytes);
 
 			byte[] contentBytes = null;
 			if (encrypt) {
-				contentBytes = DESUtils.encrypt(tmp, pwd);// 数据加密
+				contentBytes = DESUtils.encrypt(tmp, Constans.PWD);// 数据加密
 			} else {
 				contentBytes = tmp;// 不需要加密
 			}
-			int packetCount = contentBytes.length / (len - 4);// 数据内容分包数，为什么-4，是因为包内容里面包含2个字节的总包数，2个字节的当前包
-			int endPacketLength = (contentBytes.length) % (len - 4);// 最后一个数据包的长度
+			int packetCount = contentBytes.length / (Constans.PACKET_LENGTH - 4);// 数据内容分包数，为什么-4，是因为包内容里面包含2个字节的总包数，2个字节的当前包
+			int endPacketLength = (contentBytes.length) % (Constans.PACKET_LENGTH - 4);// 最后一个数据包的长度
 
 			byte[] allPacketBytes = null;// 总包数的字节数组
 			if (endPacketLength > 0) {
+				// 获取总包数
 				allPacketBytes = getAllPacketBytes(packetCount + 1);
 				endPacketLength = endPacketLength + 4;
 			} else {
@@ -358,20 +363,20 @@ public class ProtocolUtils {
 					// 临时协议头
 					byte[] tmp_head = new byte[53];
 					// 每个数据包长度
-					byte[] retAryBytes = new byte[len];
+					byte[] retAryBytes = new byte[Constans.PACKET_LENGTH];
 					// 需要校验的数据内容
-					byte[] data = new byte[tmp_head.length + len];
+					byte[] data = new byte[tmp_head.length + Constans.PACKET_LENGTH];
 					// 最后发送的数据包
-					byte[] allData = new byte[tmp_head.length + len + 3];
+					byte[] allData = new byte[tmp_head.length + Constans.PACKET_LENGTH + 3];
 					// 当前包（从1开始）
 					byte[] currPacketBytes = getCurrPacketBytes(i + 1);
 					// 包内容
 					System.arraycopy(allPacketBytes, 0, retAryBytes, 0, allPacketBytes.length);
 					System.arraycopy(currPacketBytes, 0, retAryBytes, allPacketBytes.length, currPacketBytes.length);
-					System.arraycopy(contentBytes, i * (len - 4), retAryBytes,
-							allPacketBytes.length + currPacketBytes.length, (len - 4));
+					System.arraycopy(contentBytes, i * (Constans.PACKET_LENGTH - 4), retAryBytes,
+							allPacketBytes.length + currPacketBytes.length, (Constans.PACKET_LENGTH - 4));
 					// 包内容属性
-					byte[] packetBytes = getPacketBytes(true, encrypt, len);
+					byte[] packetBytes = getPacketBytes(true, encrypt, Constans.PACKET_LENGTH);
 					// 数组合并：开始符
 					System.arraycopy(start, 0, tmp_head, 0, start.length);
 					// 数组合并：开始符+命令编号
@@ -399,7 +404,9 @@ public class ProtocolUtils {
 					// 数组合并：开始符+命令编号+发送时间+包内容属性+流水号+后台服务器用户标识+用户验证标识+发送用户Id+包内容
 					System.arraycopy(tmp_head, 0, data, 0, tmp_head.length);
 					System.arraycopy(retAryBytes, 0, data, tmp_head.length, retAryBytes.length);
-					byte[] crcBytes = getCrc(data);
+
+					// 获取校验码
+					byte[] crcBytes = CRCCheck.getCRCByteValue(data);
 					// 数组合并：开始符+命令编号+发送时间+包内容属性+流水号+后台服务器用户标识+用户验证标识+发送用户Id+包内容+校验码
 					System.arraycopy(data, 0, allData, 0, data.length);
 					System.arraycopy(crcBytes, 0, allData, data.length, crcBytes.length);
@@ -423,7 +430,7 @@ public class ProtocolUtils {
 					// 包内容
 					System.arraycopy(allPacketBytes, 0, endPacket, 0, allPacketBytes.length);
 					System.arraycopy(currPacketBytes, 0, endPacket, allPacketBytes.length, currPacketBytes.length);
-					System.arraycopy(contentBytes, i * (len - 4), endPacket,
+					System.arraycopy(contentBytes, i * (Constans.PACKET_LENGTH - 4), endPacket,
 							allPacketBytes.length + currPacketBytes.length, (endPacketLength - 4));
 					// 包内容属性
 					byte[] packetBytes = getPacketBytes(true, encrypt, endPacketLength);
@@ -455,7 +462,7 @@ public class ProtocolUtils {
 					System.arraycopy(tmp_head, 0, data, 0, tmp_head.length);
 					System.arraycopy(endPacket, 0, data, tmp_head.length, endPacket.length);
 					// 校验码
-					byte[] crcBytes = getCrc(data);
+					byte[] crcBytes = CRCCheck.getCRCByteValue(data);
 					// 数组合并：开始符+命令编号+发送时间+包内容属性+流水号+后台服务器用户标识+用户验证标识+发送用户Id+包内容+校验码
 					System.arraycopy(data, 0, allData, 0, data.length);
 					System.arraycopy(crcBytes, 0, allData, data.length, crcBytes.length);
@@ -500,14 +507,13 @@ public class ProtocolUtils {
 				// 数组合并：开始符+命令编号+发送时间+包内容属性+流水号+后台服务器用户标识+用户验证标识+发送用户Id+包内容
 				System.arraycopy(tmp_head, 0, data, 0, tmp_head.length);
 				System.arraycopy(contentBytes, 0, data, tmp_head.length, contentBytes.length);
-				byte[] crcBytes = getCrc(data);
+				byte[] crcBytes = CRCCheck.getCRCByteValue(data);
 				// 数组合并：开始符+命令编号+发送时间+包内容属性+流水号+后台服务器用户标识+用户验证标识+发送用户Id+包内容+校验码
 				System.arraycopy(data, 0, allData, 0, data.length);
 				System.arraycopy(crcBytes, 0, allData, data.length, crcBytes.length);
 				// 数组合并：开始符+命令编号+发送时间+包内容属性+流水号+后台服务器用户标识+用户验证标识+发送用户Id+包内容+校验码+结束符
 				System.arraycopy(end, 0, allData, data.length + crcBytes.length, end.length);
 				byteList.add(allData);
-
 			}
 			return byteList;
 
@@ -516,40 +522,6 @@ public class ProtocolUtils {
 			return null;
 		}
 
-	}
-
-	/**
-	 * 获取CRC16校验码
-	 * 
-	 * @param data
-	 * @return
-	 */
-	public static byte[] getCrc(byte[] data) {
-		int high;
-		int flag;
-
-		// 16位寄存器，所有数位均为1
-		int wcrc = 0xffff;
-		for (int i = 0; i < data.length; i++) {
-			// 16 位寄存器的高位字节
-			high = wcrc >> 8;
-			// 取被校验串的一个字节与 16 位寄存器的高位字节进行“异或”运算
-			wcrc = high ^ data[i];
-			for (int j = 0; j < 8; j++) {
-				flag = wcrc & 0x0001;
-				// 把这个 16 寄存器向右移一位
-				wcrc = wcrc >> 1;
-				// 若向右(标记位)移出的数位是 1,则生成多项式 1010 0000 0000 0001 和这个寄存器进行“异或”运算
-				if (flag == 1)
-					wcrc ^= 0xa001;
-			}
-		}
-		String hexString = Integer.toHexString(wcrc);
-		if (hexString.length() > 4) {
-			return HexString2Bytes(hexString.substring(4));
-		} else {
-			return HexString2Bytes(hexString);
-		}
 	}
 
 	// 从十六进制字符串到字节数组转换
@@ -730,7 +702,7 @@ public class ProtocolUtils {
 
 		byte[] decrypt = null;
 		byte[] tmp = null;
-		if (flag) {// 分包
+		if (flag) {// 分包，分包情况下，包内容前四个字节代表总包数和当前包
 			tmp = new byte[data.length - 60];
 			System.arraycopy(data, 57, tmp, 0, tmp.length);
 		} else {// 不分包
@@ -808,11 +780,16 @@ public class ProtocolUtils {
 	public static boolean checkCrc(byte[] data) {
 
 		byte[] tmp = new byte[2];
+		System.out.println("接收的数据：" + Arrays.toString(data));
 		System.arraycopy(data, data.length - 3, tmp, 0, tmp.length);
 		byte[] crcByte = new byte[data.length - 3];
 		System.arraycopy(data, 0, crcByte, 0, data.length - 3);
-		byte[] crc = ProtocolUtils.getCrc(crcByte);
+		System.out.println("需要校验的数据:" + Arrays.toString(crcByte));
+		byte[] crc = CRCCheck.getCRCByteValue(crcByte);
 		boolean b = Arrays.equals(tmp, crc);
+		System.out.println("原校验码:" + Arrays.toString(tmp));
+		System.out.println("校验码:" + Arrays.toString(crc));
+		System.out.println("数据校验成功与否：" + b);
 		return b;
 	}
 

@@ -3,12 +3,15 @@ package test;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class SocketServer extends Thread {
 
 	private ServerSocket serverSocket = null;
 	private int port = 9090;
 	private Socket accept = null;
+	private static ExecutorService executorService;
 
 	public SocketServer() {
 		try {
@@ -24,9 +27,8 @@ public class SocketServer extends Thread {
 			try {
 				accept = serverSocket.accept();
 				System.out.println("连接成功");
-				new HandlerThread(accept).start();
+				executorService.execute(new ThreadHandler(accept));
 			} catch (IOException e) {
-
 				e.printStackTrace();
 			}
 
@@ -34,6 +36,7 @@ public class SocketServer extends Thread {
 	}
 
 	public static void main(String[] args) throws Exception {
+		executorService = Executors.newCachedThreadPool();
 		new SocketServer().start();
 	}
 
