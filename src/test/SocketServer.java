@@ -38,6 +38,7 @@ public class SocketServer extends Thread {
 	public static void main(String[] args) throws Exception {
 		executorService = Executors.newCachedThreadPool();
 		new SocketServer().start();
+		new HeartThread(8989).start();
 	}
 
 }
